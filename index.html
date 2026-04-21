@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>SOP Checker v2 — MRP AutoRub</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap');
+
+:root {
+  --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #242424; --border: #2e2e2e;
+  --accent: #00e5a0; --accent-dim: rgba(0,229,160,0.12); --accent-mid: rgba(0,229,160,0.35);
+  --warn: #ffb800; --warn-dim: rgba(255,184,0,0.12);
+  --danger: #ff4f4f; --danger-dim: rgba(255,79,79,0.1);
+  --purple: #b388ff; --purple-dim: rgba(179,136,255,0.12);
+  --cyan: #00c8e0; --cyan-dim: rgba(0,200,224,0.12);
+  --text: #f0f0f0; --muted: #888; --muted2: #555;
+  --mono: 'DM Mono', monospace; --display: 'Syne', sans-serif;
+  --radius: 12px;
+}
+body.light {
+  --bg: #f4f4ef; --surface: #ffffff; --surface2: #ededea; --border: #ddddd8;
+  --text: #1a1a1a; --muted: #777; --muted2: #bbb;
+  --accent-dim: rgba(0,160,110,0.1); --warn-dim: rgba(200,140,0,0.1);
+  --danger-dim: rgba(200,60,60,0.08); --purple-dim: rgba(120,80,200,0.1);
+  --cyan-dim: rgba(0,160,180,0.1);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { background: var(--bg); color: var(--text); font-family: var(--mono); min-height: 100vh; transition: background .25s, color .25s; }
+
+/* ── HEADER ── */
+.header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 16px 12px; position: sticky; top: 0; z-index: 100; }
+.header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; }
+.brand { font-family: var(--display); font-size: 12px; font-weight: 800; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; }
+.brand span { color: var(--muted); font-weight: 600; }
+.header-actions { display: flex; gap: 6px; align-items: center; }
+.icon-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 5px 11px; font-family: var(--mono); font-size: 11px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; transition: all .15s; }
+.icon-btn:active, .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+.spin { animation: spin .8s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.search-wrap { position: relative; }
+.search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 16px; }
+#search { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 11px 11px 11px 38px; font-family: var(--mono); font-size: 15px; color: var(--text); outline: none; transition: border-color .2s; -webkit-appearance: none; }
+#search:focus { border-color: var(--accent); }
+#search::placeholder { color: var(--muted); }
+
+/* ── OVERALL PROGRESS BAR ── */
+.progress-wrap { background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; }
+.progress-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.progress-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.progress-pct { font-family: var(--display); font-size: 13px; font-weight: 800; color: var(--accent); }
+.progress-bar-bg { height: 8px; background: var(--surface2); border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #00b87a); border-radius: 10px; transition: width .8s cubic-bezier(.4,0,.2,1); width: 0%; }
+.progress-counts { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.progress-counts b { color: var(--accent); }
+
+/* ── TABS ── */
+.tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex-shrink: 0; padding: 10px 14px; font-family: var(--mono); font-size: 12px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; background: none; border-top: none; border-left: none; border-right: none; transition: color .15s; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.view { display: none; } .view.active { display: block; }
+
+/* ── FILTERS ── */
+.filters { display: flex; gap: 6px; padding: 10px 16px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--border); }
+.filters::-webkit-scrollbar { display: none; }
+.filter-btn { flex-shrink: 0; padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: var(--mono); font-size: 11px; cursor: pointer; white-space: nowrap; transition: all .15s; }
+.filter-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+/* ── STATS BAR ── */
+.stats-bar { display: flex; border-bottom: 1px solid var(--border); }
+.stat { flex: 1; padding: 10px 0; text-align: center; border-right: 1px solid var(--border); }
+.stat:last-child { border-right: none; }
+.stat-num { font-family: var(--display); font-size: 20px; font-weight: 800; display: block; line-height: 1; }
+.stat-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; display: block; margin-top: 3px; }
+.stat.total .stat-num { color: var(--text); }
+.stat.done .stat-num { color: var(--accent); }
+.stat.pend .stat-num { color: var(--warn); }
+
+/* ── SYNC STATUS ── */
+.sync-status { text-align: center; padding: 5px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); background: var(--surface); }
+.sync-status.ok { color: var(--accent); } .sync-status.err { color: var(--danger); }
+
+/* ── RESULTS ── */
+.results { padding: 12px 16px; }
+.results-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; padding: 0 2px; }
+.part-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 13px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; transition: border-color .15s; }
+.part-card:active { background: var(--surface2); }
+.part-card.completed { border-left: 3px solid var(--accent); }
+.part-card.pending { border-left: 3px solid var(--warn); }
+.part-info { flex: 1; min-width: 0; }
+.part-no { font-family: var(--display); font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.part-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.part-meta span { display: inline-block; margin-right: 8px; }
+.status-badge { flex-shrink: 0; padding: 5px 10px; border-radius: 20px; font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+.badge-completed { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,229,160,.3); }
+.badge-pending { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(255,184,0,.3); }
+
+/* ── EMPTY / NOT FOUND ── */
+.empty-state { text-align: center; padding: 50px 20px; color: var(--muted); }
+.empty-icon { font-size: 42px; margin-bottom: 10px; }
+.empty-text { font-size: 13px; line-height: 1.7; }
+.not-found { text-align: center; padding: 40px 20px; }
+.not-found-icon { font-size: 36px; margin-bottom: 10px; }
+.not-found-title { font-family: var(--display); font-size: 16px; font-weight: 700; color: var(--danger); margin-bottom: 6px; }
+.not-found-sub { font-size: 12px; color: var(--muted); }
+.not-found-partno { display: inline-block; margin-top: 8px; background: var(--danger-dim); border: 1px solid rgba(255,79,79,.3); color: var(--danger); padding: 3px 10px; border-radius: 20px; font-size: 12px; }
+.loading-state { text-align: center; padding: 60px 20px; color: var(--muted); }
+.loading-spinner { font-size: 32px; animation: spin 1s linear infinite; display: block; margin-bottom: 12px; }
+.loading-text { font-size: 13px; }
+
+/* ── DASHBOARD ── */
+.dash { padding: 16px; }
+.dash-title { font-family: var(--display); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; }
+
+.overall-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+.overall-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+.overall-title { font-family: var(--display); font-size: 14px; font-weight: 700; }
+.overall-pct-big { font-family: var(--display); font-size: 28px; font-weight: 800; color: var(--accent); }
+.overall-nums-row { display: flex; gap: 0; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.overall-num { flex: 1; text-align: center; padding: 10px 0; border-right: 1px solid var(--border); }
+.overall-num:last-child { border-right: none; }
+.overall-num-val { font-family: var(--display); font-size: 20px; font-weight: 800; display: block; }
+.overall-num-val.c { color: var(--accent); } .overall-num-val.p { color: var(--warn); }
+.overall-num-label { font-size: 9px; color: var(--muted); text-transform: uppercase; display: block; margin-top: 2px; }
+.overall-bar { height: 10px; background: var(--surface2); border-radius: 10px; overflow: hidden; }
+.overall-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #00b87a); border-radius: 10px; transition: width .8s ease; }
+
+/* Category cards */
+.cat-grid { display: grid; gap: 10px; }
+.cat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; }
+.cat-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cat-name { font-family: var(--display); font-size: 14px; font-weight: 700; }
+.cat-pct { font-size: 12px; font-weight: 600; }
+.cat-bar { height: 6px; background: var(--surface2); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
+.cat-bar-fill { height: 100%; border-radius: 10px; transition: width .8s ease; }
+.cat-nums { display: flex; gap: 12px; font-size: 11px; }
+.cat-done-lbl { color: var(--accent); } .cat-pend-lbl { color: var(--warn); } .cat-total-lbl { color: var(--muted); }
+
+/* Cat colors */
+.cat-epdm .cat-bar-fill { background: linear-gradient(90deg, #00e5a0, #00b87a); }
+.cat-epdm .cat-pct { color: var(--accent); }
+.cat-silicone .cat-bar-fill { background: linear-gradient(90deg, #b388ff, #7e57c2); }
+.cat-silicone .cat-pct { color: var(--purple); }
+.cat-nitrile .cat-bar-fill { background: linear-gradient(90deg, #ffb800, #e07b00); }
+.cat-nitrile .cat-pct { color: var(--warn); }
+.cat-breather .cat-bar-fill { background: linear-gradient(90deg, #00c8e0, #0090a0); }
+.cat-breather .cat-pct { color: var(--cyan); }
+.cat-packing .cat-bar-fill { background: linear-gradient(90deg, #ff8a65, #e64a19); }
+.cat-packing .cat-pct { color: #ff8a65; }
+.cat-other .cat-bar-fill { background: linear-gradient(90deg, #888, #555); }
+.cat-other .cat-pct { color: var(--muted); }
+
+/* ── PRINT TAB ── */
+.print-view { padding: 16px; }
+.print-intro { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.6; }
+.print-controls { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
+.print-controls-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 10px; }
+.print-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.print-filter-btn { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: var(--mono); font-size: 11px; cursor: pointer; transition: all .15s; }
+.print-filter-btn.active { background: var(--warn-dim); border-color: var(--warn); color: var(--warn); }
+.print-preview-count { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.print-preview-count b { color: var(--warn); }
+.print-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; background: var(--warn-dim); border: 1px solid rgba(255,184,0,.35); border-radius: 10px; color: var(--warn); font-family: var(--mono); font-size: 13px; cursor: pointer; font-weight: 500; transition: all .15s; }
+.print-btn:hover { background: rgba(255,184,0,.2); }
+.print-list { margin-top: 12px; }
+.print-list-item { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--warn); border-radius: 10px; padding: 10px 14px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+.print-list-partno { font-family: var(--display); font-size: 14px; font-weight: 700; }
+.print-list-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.print-list-badge { font-size: 10px; padding: 3px 8px; background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(255,184,0,.3); border-radius: 20px; }
+
+/* ── MODAL ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 200; align-items: flex-end; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border); border-radius: 20px 20px 0 0; padding: 20px; width: 100%; max-width: 480px; animation: slideUp .25s ease; }
+@keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 18px; }
+.modal-partno { font-family: var(--display); font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+.modal-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.modal-row:last-of-type { border-bottom: none; }
+.modal-key { color: var(--muted); }
+.modal-val { font-weight: 500; }
+.modal-status-big { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 13px 16px; border-radius: 12px; font-family: var(--display); font-size: 15px; font-weight: 700; }
+.modal-status-big.completed { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,229,160,.25); }
+.modal-status-big.pending { background: var(--warn-dim); color: var(--warn); border: 1px solid rgba(255,184,0,.25); }
+.modal-close { width: 100%; margin-top: 10px; padding: 12px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; color: var(--muted); font-family: var(--mono); font-size: 13px; cursor: pointer; }
+
+/* ── PRINT STYLES ── */
+@media print {
+  body { background: white !important; color: black !important; font-family: Arial, sans-serif; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .print-header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1a5c3a; padding-bottom: 12px; }
+  .print-header h1 { font-size: 18px; font-weight: bold; color: #1a5c3a; }
+  .print-header p { font-size: 11px; color: #666; margin-top: 4px; }
+  .print-table { width: 100%; border-collapse: collapse; }
+  .print-table th { background: #1F4E79; color: white; padding: 8px 10px; text-align: left; font-size: 11px; }
+  .print-table td { padding: 7px 10px; border-bottom: 1px solid #ddd; font-size: 11px; }
+  .print-table tr:nth-child(even) { background: #f9f9f9; }
+  .print-table .sno { width: 40px; color: #888; }
+  .print-table .status-cell { color: #c07000; font-weight: bold; }
+  .print-footer { margin-top: 16px; font-size: 10px; color: #888; text-align: right; }
+}
+.print-only { display: none; }
+</style>
+</head>
+<body>
+
+<!-- PRINT-ONLY CONTENT (hidden on screen, shown when printing) -->
+<div class="print-only" id="printContent">
+  <div class="print-header">
+    <h1>MRP AutoRub — SOP Pending Parts List</h1>
+    <p id="printMeta"></p>
+  </div>
+  <table class="print-table">
+    <thead>
+      <tr>
+        <th class="sno">#</th>
+        <th>Part Number</th>
+        <th>Material / Category</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="printTableBody"></tbody>
+  </table>
+  <div class="print-footer" id="printFooter"></div>
+</div>
+
+<!-- SCREEN CONTENT -->
+<div class="no-print">
+
+<div class="header">
+  <div class="header-top">
+    <div class="brand">MRP AutoRub <span>— SOP Checker</span></div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="toggleTheme()" id="themeBtn">☀ Light</button>
+      <button class="icon-btn" onclick="loadData()"><span id="syncIcon">↻</span> <span id="syncLabel">Sync</span></button>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input type="search" id="search" placeholder="Type part number..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  </div>
+</div>
+
+<!-- OVERALL PROGRESS BAR -->
+<div class="progress-wrap" id="progressWrap">
+  <div class="progress-top">
+    <span class="progress-label">Overall SOP Progress</span>
+    <span class="progress-pct" id="progressPct">0%</span>
+  </div>
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+  <div class="progress-counts" id="progressCounts">Loading...</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('search')">🔍 Search</button>
+  <button class="tab" onclick="switchTab('dashboard')">📊 Dashboard</button>
+  <button class="tab" onclick="switchTab('print')">🖨 Print</button>
+</div>
+
+<!-- ════ SEARCH VIEW ════ -->
+<div class="view active" id="view-search">
+  <div class="filters">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="COMPLETED">✓ Done</button>
+    <button class="filter-btn" data-filter="PENDING">⏳ Pending</button>
+    <button class="filter-btn" data-filter="EPDM">EPDM</button>
+    <button class="filter-btn" data-filter="SILICONE">Silicone</button>
+    <button class="filter-btn" data-filter="NITRILE">Nitrile</button>
+    <button class="filter-btn" data-filter="BREATHER">Breather</button>
+    <button class="filter-btn" data-filter="PACKING">Packing</button>
+  </div>
+  <div class="stats-bar">
+    <div class="stat total"><span class="stat-num" id="statTotal">—</span><span class="stat-label">Total</span></div>
+    <div class="stat done"><span class="stat-num" id="statDone">—</span><span class="stat-label">Done</span></div>
+    <div class="stat pend"><span class="stat-num" id="statPend">—</span><span class="stat-label">Pending</span></div>
+  </div>
+  <div class="sync-status" id="syncStatus">Loading data...</div>
+  <div class="results" id="results">
+    <div class="loading-state">
+      <span class="loading-spinner">↻</span>
+      <div class="loading-text">Fetching latest data from Google Sheets...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ DASHBOARD VIEW ════ -->
+<div class="view" id="view-dashboard">
+  <div class="dash" id="dashContent">
+    <div class="loading-state">
+      <span class="loading-spinner">↻</span>
+      <div class="loading-text">Loading dashboard...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PRINT VIEW ════ -->
+<div class="view" id="view-print">
+  <div class="print-view">
+    <div class="print-intro">
+      Filter by material category, then print a clean pending parts list to hand off to the packing section worker.
+    </div>
+    <div class="print-controls">
+      <div class="print-controls-title">Filter by Material</div>
+      <div class="print-filter-row" id="printFilters">
+        <button class="print-filter-btn active" data-pfilter="ALL">All Materials</button>
+        <button class="print-filter-btn" data-pfilter="EPDM">EPDM</button>
+        <button class="print-filter-btn" data-pfilter="SILICONE">Silicone</button>
+        <button class="print-filter-btn" data-pfilter="NITRILE">Nitrile</button>
+        <button class="print-filter-btn" data-pfilter="BREATHER">Breather</button>
+        <button class="print-filter-btn" data-pfilter="PACKING">Packing</button>
+      </div>
+      <div class="print-preview-count" id="printPreviewCount">Select a filter to preview pending parts.</div>
+      <button class="print-btn" onclick="doPrint()">🖨 &nbsp;Print Pending List</button>
+    </div>
+    <div class="print-list" id="printList"></div>
+  </div>
+</div>
+
+</div><!-- end .no-print -->
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-partno" id="modalPartNo"></div>
+    <div class="modal-row"><span class="modal-key">Material</span><span class="modal-val" id="modalMaterial"></span></div>
+    <div class="modal-row"><span class="modal-key">S.No</span><span class="modal-val" id="modalSno"></span></div>
+    <div class="modal-row"><span class="modal-key">In Runner List</span><span class="modal-val" style="color:var(--accent)">✓ YES</span></div>
+    <div class="modal-status-big" id="modalStatusBig"></div>
+    <button class="modal-close" onclick="document.getElementById('modalOverlay').classList.remove('open')">Close</button>
+  </div>
+</div>
+
+<script>
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRmEC3eQtpQEv5kydGZhhlDs9tQca6nvoGYRe9tEZyjW7J3yigfWIHMN5yoRZhZjoaT0tTnIre0faQw/pub?gid=1204003115&single=true&output=csv';
+
+let PARTS = [];
+let currentFilter = 'all';
+let searchQuery = '';
+let lastSync = null;
+let printFilter = 'ALL';
+let isDark = true;
+
+const CATEGORIES = ['EPDM', 'SILICONE', 'NITRILE', 'BREATHER', 'PACKING'];
+const CAT_CLASS = { EPDM: 'epdm', SILICONE: 'silicone', NITRILE: 'nitrile', BREATHER: 'breather', PACKING: 'packing' };
+
+// ── CSV PARSER ──
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const parts = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim().replace(/"/g, ''));
+    if (cols.length >= 3 && cols[1]) {
+      parts.push({
+        sno: cols[0] || i,
+        'Part No': cols[1],
+        Material: cols[2] || '',
+        Status: (cols[3] || 'PENDING').toUpperCase().trim()
+      });
+    }
+  }
+  return parts;
+}
+
+// ── LOAD DATA ──
+async function loadData() {
+  const icon = document.getElementById('syncIcon');
+  const label = document.getElementById('syncLabel');
+  const statusEl = document.getElementById('syncStatus');
+  icon.classList.add('spin');
+  label.textContent = 'Syncing...';
+  statusEl.className = 'sync-status';
+  statusEl.textContent = 'Fetching from Google Sheets...';
+
+  try {
+    const res = await fetch(CSV_URL + '&t=' + Date.now());
+    if (!res.ok) throw new Error('Network error');
+    const text = await res.text();
+    PARTS = parseCSV(text);
+    lastSync = new Date();
+    const timeStr = lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    statusEl.className = 'sync-status ok';
+    statusEl.textContent = `✓ Live — ${PARTS.length} parts — Synced ${timeStr}`;
+    icon.classList.remove('spin');
+    label.textContent = 'Sync';
+    updateProgressBar();
+    render();
+    renderDashboard();
+    renderPrintList();
+  } catch (err) {
+    statusEl.className = 'sync-status err';
+    statusEl.textContent = '⚠ Could not sync — check internet connection';
+    icon.classList.remove('spin');
+    label.textContent = 'Retry';
+    if (PARTS.length === 0) {
+      document.getElementById('results').innerHTML = `
+        <div class="not-found">
+          <div class="not-found-icon">⚠</div>
+          <div class="not-found-title">No Internet</div>
+          <div class="not-found-sub">Connect and tap Retry to load parts list.</div>
+        </div>`;
+    }
+  }
+}
+
+// ── PROGRESS BAR ──
+function updateProgressBar() {
+  if (!PARTS.length) return;
+  const total = PARTS.length;
+  const done = PARTS.filter(p => p.Status === 'COMPLETED').length;
+  const pct = Math.round((done / total) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressCounts').innerHTML =
+    `<b>${done}</b> done &nbsp;·&nbsp; ${total - done} pending &nbsp;·&nbsp; ${total} total`;
+}
+
+// ── THEME ──
+function toggleTheme() {
+  isDark = !isDark;
+  document.body.classList.toggle('light', !isDark);
+  document.getElementById('themeBtn').textContent = isDark ? '☀ Light' : '🌙 Dark';
+}
+
+// ── TABS ──
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['search', 'dashboard', 'print'];
+    t.classList.toggle('active', names[i] === tab);
+  });
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + tab).classList.add('active');
+}
+
+// ── FILTERING ──
+function normalize(str) { return str.replace(/\s+/g, '').toUpperCase(); }
+
+function getFiltered() {
+  return PARTS.filter(p => {
+    const q = normalize(searchQuery);
+    const matchSearch = !q || normalize(p['Part No']).includes(q);
+    const matchFilter = currentFilter === 'all' ||
+      p.Status === currentFilter ||
+      p.Material.toUpperCase() === currentFilter;
+    return matchSearch && matchFilter;
+  });
+}
+
+function updateStats() {
+  const filtered = getFiltered();
+  document.getElementById('statTotal').textContent = filtered.length;
+  document.getElementById('statDone').textContent = filtered.filter(p => p.Status === 'COMPLETED').length;
+  document.getElementById('statPend').textContent = filtered.filter(p => p.Status === 'PENDING').length;
+}
+
+// ── SEARCH RENDER ──
+function render() {
+  const results = document.getElementById('results');
+  const filtered = getFiltered();
+  updateStats();
+  if (PARTS.length === 0) return;
+
+  if (searchQuery && filtered.length === 0) {
+    results.innerHTML = `
+      <div class="not-found">
+        <div class="not-found-icon">⚠</div>
+        <div class="not-found-title">Not in Runner List</div>
+        <div class="not-found-sub">This part is not in the runner parts list.</div>
+        <div class="not-found-partno">${searchQuery.trim()}</div>
+      </div>`;
+    return;
+  }
+
+  if (!searchQuery && currentFilter === 'all') {
+    results.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-text">Type a part number above<br>to check its SOP status</div>
+      </div>`;
+    return;
+  }
+
+  const label = filtered.length === 1 ? '1 part found' : `${filtered.length} parts found`;
+  let html = `<div class="results-label">${label}</div>`;
+  filtered.forEach(p => {
+    const isCompleted = p.Status === 'COMPLETED';
+    html += `
+      <div class="part-card ${isCompleted ? 'completed' : 'pending'}" onclick="showModal('${p['Part No'].replace(/'/g, "\\'")}')">
+        <div class="part-info">
+          <div class="part-no">${p['Part No']}</div>
+          <div class="part-meta"><span>#${p.sno}</span><span>${p.Material}</span></div>
+        </div>
+        <div class="status-badge ${isCompleted ? 'badge-completed' : 'badge-pending'}">
+          ${isCompleted ? '✓ Done' : '⏳ Pending'}
+        </div>
+      </div>`;
+  });
+  results.innerHTML = html;
+}
+
+// ── DASHBOARD RENDER ──
+function renderDashboard() {
+  if (!PARTS.length) return;
+  const total = PARTS.length;
+  const done = PARTS.filter(p => p.Status === 'COMPLETED').length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+
+  // Per-category stats
+  const catStats = {};
+  CATEGORIES.forEach(c => { catStats[c] = { done: 0, total: 0 }; });
+  catStats['OTHER'] = { done: 0, total: 0 };
+  PARTS.forEach(p => {
+    const mat = p.Material.toUpperCase();
+    const key = CATEGORIES.includes(mat) ? mat : 'OTHER';
+    catStats[key].total++;
+    if (p.Status === 'COMPLETED') catStats[key].done++;
+  });
+
+  let catHTML = '';
+  const allCats = [...CATEGORIES, 'OTHER'];
+  allCats.forEach(cat => {
+    const s = catStats[cat];
+    if (s.total === 0) return;
+    const cp = Math.round((s.done / s.total) * 100);
+    const cls = CAT_CLASS[cat] || 'other';
+    catHTML += `
+      <div class="cat-card cat-${cls}">
+        <div class="cat-card-header">
+          <span class="cat-name">${cat}</span>
+          <span class="cat-pct">${cp}%</span>
+        </div>
+        <div class="cat-bar"><div class="cat-bar-fill" style="width:${cp}%"></div></div>
+        <div class="cat-nums">
+          <span class="cat-done-lbl">✓ ${s.done} done</span>
+          <span class="cat-pend-lbl">⏳ ${s.total - s.done} pending</span>
+          <span class="cat-total-lbl">/ ${s.total} total</span>
+        </div>
+      </div>`;
+  });
+
+  document.getElementById('dashContent').innerHTML = `
+    <div class="dash-title">Overall Progress</div>
+    <div class="overall-card">
+      <div class="overall-header">
+        <span class="overall-title">All Parts</span>
+        <span class="overall-pct-big">${pct}%</span>
+      </div>
+      <div class="overall-nums-row">
+        <div class="overall-num"><span class="overall-num-val">${total}</span><span class="overall-num-label">Total</span></div>
+        <div class="overall-num"><span class="overall-num-val c">${done}</span><span class="overall-num-label">Done</span></div>
+        <div class="overall-num"><span class="overall-num-val p">${total - done}</span><span class="overall-num-label">Pending</span></div>
+      </div>
+      <div class="overall-bar"><div class="overall-bar-fill" style="width:${pct}%"></div></div>
+    </div>
+    <div class="dash-title">By Category</div>
+    <div class="cat-grid">${catHTML}</div>
+  `;
+}
+
+// ── PRINT VIEW RENDER ──
+function renderPrintList() {
+  if (!PARTS.length) return;
+  const pending = PARTS.filter(p => {
+    if (p.Status !== 'PENDING') return false;
+    if (printFilter === 'ALL') return true;
+    return p.Material.toUpperCase() === printFilter;
+  });
+
+  document.getElementById('printPreviewCount').innerHTML =
+    `Showing <b>${pending.length}</b> pending part${pending.length !== 1 ? 's' : ''} ${printFilter !== 'ALL' ? '— ' + printFilter : '— All Materials'}`;
+
+  if (pending.length === 0) {
+    document.getElementById('printList').innerHTML = `
+      <div class="empty-state" style="padding:30px 20px">
+        <div class="empty-icon">🎉</div>
+        <div class="empty-text">No pending parts for this filter!</div>
+      </div>`;
+    return;
+  }
+
+  let html = '';
+  pending.forEach(p => {
+    html += `
+      <div class="print-list-item">
+        <div>
+          <div class="print-list-partno">${p['Part No']}</div>
+          <div class="print-list-meta">#${p.sno} · ${p.Material}</div>
+        </div>
+        <div class="print-list-badge">⏳ Pending</div>
+      </div>`;
+  });
+  document.getElementById('printList').innerHTML = html;
+}
+
+// ── PRINT ACTION ──
+function doPrint() {
+  if (!PARTS.length) { alert('Data not loaded yet. Please sync first.'); return; }
+  const pending = PARTS.filter(p => {
+    if (p.Status !== 'PENDING') return false;
+    if (printFilter === 'ALL') return true;
+    return p.Material.toUpperCase() === printFilter;
+  });
+
+  const now = new Date().toLocaleString();
+  const filterLabel = printFilter === 'ALL' ? 'All Materials' : printFilter;
+  document.getElementById('printMeta').textContent =
+    `Material: ${filterLabel} · ${pending.length} Pending Parts · Printed: ${now}`;
+
+  let rows = '';
+  pending.forEach((p, i) => {
+    rows += `<tr>
+      <td class="sno">${i + 1}</td>
+      <td><strong>${p['Part No']}</strong></td>
+      <td>${p.Material}</td>
+      <td class="status-cell">⏳ PENDING</td>
+    </tr>`;
+  });
+  document.getElementById('printTableBody').innerHTML = rows;
+  document.getElementById('printFooter').textContent =
+    `MRP AutoRub SOP Checker · Generated ${now} · ${pending.length} parts listed`;
+
+  window.print();
+}
+
+// ── MODAL ──
+function showModal(partNo) {
+  const p = PARTS.find(x => x['Part No'] === partNo);
+  if (!p) return;
+  const isCompleted = p.Status === 'COMPLETED';
+  document.getElementById('modalPartNo').textContent = p['Part No'];
+  document.getElementById('modalMaterial').textContent = p.Material;
+  document.getElementById('modalSno').textContent = `#${p.sno} of ${PARTS.length}`;
+  const statusEl = document.getElementById('modalStatusBig');
+  statusEl.className = `modal-status-big ${isCompleted ? 'completed' : 'pending'}`;
+  statusEl.innerHTML = isCompleted ? '✓ &nbsp;SOP COMPLETED' : '⏳ &nbsp;SOP PENDING';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById('modalOverlay'))
+    document.getElementById('modalOverlay').classList.remove('open');
+}
+
+// ── EVENTS ──
+document.getElementById('search').addEventListener('input', function () {
+  searchQuery = this.value.trim();
+  render();
+});
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    currentFilter = this.dataset.filter;
+    render();
+  });
+});
+
+document.querySelectorAll('.print-filter-btn').forEach(btn => {
+  btn.addEventListener('click', function () {
+    document.querySelectorAll('.print-filter-btn').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    printFilter = this.dataset.pfilter;
+    renderPrintList();
+  });
+});
+
+// Auto-refresh every 5 minutes
+setInterval(loadData, 5 * 60 * 1000);
+loadData();
+</script>
+</body>
+</html>
